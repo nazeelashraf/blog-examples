@@ -10,7 +10,7 @@ const fetchAllPets = async () => {
             }
         })
 
-        console.log(result.data.content.)
+        console.log(result.data[0].id)
     } catch (err) {
         console.log(err)
     }
