@@ -1,8 +1,8 @@
 import { z } from "zod"
 
-
+// Types
 type Path = '/flags'
-type Method = 'GET' | 'POST'
+type Method = 'GET' | 'PUT'
 type ApiEndpoint = `${Method} ${Path}`
 const FeatureFlag = z.object({
     key: z.string().min(1),
@@ -11,14 +11,19 @@ const FeatureFlag = z.object({
 
 type FeatureFlagType = z.infer<typeof FeatureFlag>
 
+
+// Constants
 const responseHeaders = { headers: { 'Content-Type': 'application/json' } }
 
+
+// Custom classes
 class CustomResponse extends Response {
     constructor(response: Record<any, any>, headerOverride?: Bun.ResponseInit) {
         super(JSON.stringify(response), {...responseHeaders, ...headerOverride})
     }
 }
 
+// REST server
 Bun.serve({
     port: 8080,
     async fetch(req) {
@@ -28,11 +33,9 @@ Bun.serve({
             const method = req.method
 
             const apiEndpoint: ApiEndpoint = `${method as Method} ${url.pathname as Path}`
-
-            console.log({ apiEndpoint })
             
             switch(apiEndpoint) {
-                case 'POST /flags': {
+                case 'PUT /flags': {
                     const request = await req.json() as FeatureFlagType
                     if (!FeatureFlag.safeParse(request).success) {
                         return new CustomResponse({ message: 'Bad Request' }, { status: 400 })
@@ -70,7 +73,7 @@ Bun.serve({
                     const key = url.searchParams.get('key')
 
                     if (!key) {
-                        return new CustomResponse({ message: 'Key missing in request' }, { status: 404 })
+                        return new CustomResponse({ message: 'Key missing in request' }, { status: 400 })
                     }
 
                     if (await featureFlagFile.exists()) {
@@ -78,7 +81,7 @@ Bun.serve({
                         const value = featureFlagObject[key]
 
                         if (value === undefined) {
-                            return new CustomResponse({ message: 'Key missing in request' }, { status: 404 })
+                            return new CustomResponse({ message: 'Key is not registered' }, { status: 404 })
                         }
 
                         const response: FeatureFlagType = {
@@ -86,15 +89,17 @@ Bun.serve({
                             value
                         }
 
-                        return new CustomResponse(response, { status: 201})
+                        return new CustomResponse(response, { status: 200})
                     }
+
+                    return new CustomResponse({ message: 'Key is not registered' }, { status: 404 })
                 }
+                default:
+                    return new CustomResponse({ message: `You called ${apiEndpoint}, which I don't know how to handle!` }, { status: 404 })
             }
         } catch(err) {
             console.log(err)
             return new CustomResponse({ message: 'Internal Server Error' }, { status: 500})
         }
-
-        return new CustomResponse({ message: 'Not found' }, { status: 404 })
     }
 })
